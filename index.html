@@ -7,7 +7,6 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#f5f5f7">
 <title>Probability Distributions</title>
-<!-- Icono para la pantalla de inicio (Logo rojo f(x) simulado) -->
 <link rel="apple-touch-icon" href="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/Math_f_x.svg/1024px-Math_f_x.svg.png">
 <style>
   :root {
@@ -106,11 +105,11 @@
 <div class="calc-row" id="calcRow">
   <div class="param-box">
     <label id="x1Label">x:</label>
-    <input type="number" id="xVal" step="any" oninput="calculate('fromX')">
+    <input type="number" id="xVal" step="any" oninput="calculate('fromX')" onchange="calculate('fromX')">
   </div>
   <div class="param-box hidden" id="x2Box">
     <label>x₂:</label>
-    <input type="number" id="x2Val" step="any" oninput="calculate('fromX')">
+    <input type="number" id="x2Val" step="any" oninput="calculate('fromX')" onchange="calculate('fromX')">
   </div>
   <div class="param-box">
     <label>&nbsp;</label>
@@ -118,7 +117,7 @@
   </div>
   <div class="param-box">
     <label id="probLabel">&nbsp;</label>
-    <input type="number" id="probVal" class="prob-input" step="0.0001" min="0" max="1" oninput="calculate('fromP')">
+    <input type="number" id="probVal" class="prob-input" step="any" min="0" max="1" oninput="calculate('fromP')" onchange="calculate('fromP')">
   </div>
 </div>
 
@@ -526,7 +525,7 @@ function discCDF(k, m, p) {
   return Math.min(1, Math.max(0, s));
 }
 
-// --- Calculation ---
+// --- Calculation (Bidirectional) ---
 function calculate(dir) {
   const key = document.getElementById("distSelect").value;
   const m = DISTS[key];
@@ -535,12 +534,16 @@ function calculate(dir) {
   devBox.classList.add("hidden");
 
   if (key === "bayes3") { runBayes(p); return; }
-  if (key === "discK") { runDiscK(p); return; }
+  if (key === "discK") { runDiscK(p, dir); return; }
 
   const mode = document.getElementById("modeSelect").value;
-  const x = parseFloat(document.getElementById("xVal").value);
-  const x2 = parseFloat(document.getElementById("x2Val").value);
-  let prob = parseFloat(document.getElementById("probVal").value);
+  const xInput = document.getElementById("xVal");
+  const x2Input = document.getElementById("x2Val");
+  const probInput = document.getElementById("probVal");
+
+  let x = parseFloat(xInput.value);
+  let x2 = parseFloat(x2Input.value);
+  let prob = parseFloat(probInput.value);
   const condOn = document.getElementById("condCheck").checked;
 
   if (condOn) {
@@ -564,7 +567,7 @@ function calculate(dir) {
       }
     }
     prob = pB > 0 ? (pAB / pB) : 0;
-    document.getElementById("probVal").value = prob.toFixed(6);
+    probInput.value = prob.toFixed(6);
     devBox.classList.remove("hidden");
     devText = `<b>P(A | B) = P(A ∩ B) / P(B)</b><br>P(A ∩ B) = ${pAB.toFixed(6)}<br>P(B) = ${pB.toFixed(6)}<br><b>Result: ${prob.toFixed(6)}</b>`;
     devBox.innerHTML = devText;
@@ -581,16 +584,37 @@ function calculate(dir) {
       else if (mode === "gt") prob = 1 - discCDF(rx, m, p);
       else if (mode === "int" && !isNaN(x2)) prob = Math.max(0, discCDF(Math.round(x2), m, p) - discCDF(rx - 1, m, p));
     }
-    document.getElementById("probVal").value = Math.max(0, Math.min(1, prob)).toFixed(6);
-  } else if (dir === "fromP" && mode !== "int" && !isNaN(prob) && prob >= 0 && prob <= 1) {
+    probInput.value = Math.max(0, Math.min(1, prob)).toFixed(6);
+  } else if (dir === "fromP" && mode !== "int" && !isNaN(prob)) {
     if (m.type === "cont") {
-      x = m.inv(mode === "lt" ? prob : (1 - prob), p);
-      document.getElementById("xVal").value = x.toFixed(4);
-    } else if (mode !== "eq") {
-      const target = (mode === "le" || mode === "lt") ? prob : (1 - prob);
-      let acc = 0, k = m.dom(p)[0];
-      while (acc < target && k < 10000) { acc += m.pmf(k, p); if (acc >= target) break; k++; }
-      document.getElementById("xVal").value = (mode === "lt" || mode === "ge") ? k + 1 : k;
+      if (prob > 0 && prob < 1) {
+        const target = (mode === "lt") ? prob : (1 - prob);
+        const calcX = m.inv(target, p);
+        if (isFinite(calcX)) {
+          x = calcX;
+          xInput.value = parseFloat(x.toFixed(4));
+        }
+      }
+    } else if (prob >= 0 && prob <= 1) {
+      const [dMin, dMax] = m.dom(p);
+      if (mode === "eq") {
+        let bestK = dMin, minDiff = Infinity;
+        for (let k = dMin; k <= Math.min(2000, dMax + 20); k++) {
+          const diff = Math.abs(m.pmf(k, p) - prob);
+          if (diff < minDiff) { minDiff = diff; bestK = k; }
+        }
+        x = bestK;
+      } else {
+        const target = (mode === "le" || mode === "lt") ? prob : (1 - prob);
+        let acc = 0, k = dMin;
+        while (acc < target && k < 10000) {
+          acc += m.pmf(k, p);
+          if (acc >= target - 1e-12) break;
+          k++;
+        }
+        x = (mode === "lt" || mode === "ge") ? k + 1 : k;
+      }
+      xInput.value = x;
     }
   }
 
@@ -611,16 +635,16 @@ function calculate(dir) {
     devBox.classList.remove("hidden");
     const e = m.getEff(p);
     const pCC = (mode === "lt") ? normCDF(x - 0.5, e.mu, e.sd) : (mode === "gt") ? (1 - normCDF(x - 0.5, e.mu, e.sd)) : (normCDF(x2 + 0.5, e.mu, e.sd) - normCDF(x - 0.5, e.mu, e.sd));
-    devText = `<b>Normal Approx:</b><br>No CC: ${parseFloat(document.getElementById("probVal").value).toFixed(6)}<br>With CC (±0.5): ${pCC.toFixed(6)}`;
+    devText = `<b>Normal Approx:</b><br>No CC: ${parseFloat(probInput.value || 0).toFixed(6)}<br>With CC (±0.5): ${pCC.toFixed(6)}`;
     devBox.innerHTML = devText;
   } else {
     devText = `<b>Stats:</b><br>E(X) = ${st.mu.toFixed(4)} | Var(X) = ${st.var.toFixed(4)} | SD(X) = ${st.sd.toFixed(4)}`;
   }
 
-  drawPlot(m, p, parseFloat(document.getElementById("xVal").value), parseFloat(document.getElementById("x2Val").value), mode);
+  drawPlot(m, p, x, x2, mode);
 }
 
-function runDiscK(p) {
+function runDiscK(p, dir) {
   const xs = p.xs.split(",").map(s => parseFloat(s.trim())).filter(n => !isNaN(n));
   const rawTokens = p.ps.split(",").map(s => s.trim().toLowerCase());
   const n = Math.min(xs.length, rawTokens.length);
@@ -648,11 +672,26 @@ function runDiscK(p) {
   const sd = Math.sqrt(v);
 
   const mode = document.getElementById("modeSelect").value;
-  const x = parseFloat(document.getElementById("xVal").value) || 0;
+  let x = parseFloat(document.getElementById("xVal").value) || 0;
   const x2 = parseFloat(document.getElementById("x2Val").value) || 0;
-  let probOut = 0;
-  for (let i = 0; i < n; i++) { if (checkDisc(xs[i], mode, x, x2)) probOut += probs[i]; }
-  document.getElementById("probVal").value = probOut.toFixed(6);
+
+  if (dir === "fromP") {
+    const targetP = parseFloat(document.getElementById("probVal").value);
+    if (!isNaN(targetP)) {
+      let bestX = xs[0], minDiff = Infinity;
+      for (let i = 0; i < n; i++) {
+        let pTest = 0;
+        for (let j = 0; j < n; j++) { if (checkDisc(xs[j], mode, xs[i], x2)) pTest += probs[j]; }
+        if (Math.abs(pTest - targetP) < minDiff) { minDiff = Math.abs(pTest - targetP); bestX = xs[i]; }
+      }
+      x = bestX;
+      document.getElementById("xVal").value = x;
+    }
+  } else {
+    let probOut = 0;
+    for (let i = 0; i < n; i++) { if (checkDisc(xs[i], mode, x, x2)) probOut += probs[i]; }
+    document.getElementById("probVal").value = probOut.toFixed(6);
+  }
 
   document.getElementById("dynamicTitle").innerText = `k = ${kSolved.toFixed(4)} | E[X] = ${mu.toFixed(4)}`;
   document.getElementById("statsFooter").innerText = `μ=E(X)=${mu.toFixed(4)}   σ²=Var(X)=${v.toFixed(4)}   σ=SD(X)=${sd.toFixed(4)}`;
