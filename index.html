@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#f5f5f7">
+<title>Probability Distributions</title>
+<!-- Icono para la pantalla de inicio (Logo rojo f(x) simulado) -->
+<link rel="apple-touch-icon" href="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/Math_f_x.svg/1024px-Math_f_x.svg.png">
+<style>
+  :root {
+    --bg: #f5f5f7;
+    --card: #ffffff;
+    --pink: #f79696;
+    --blue: #6da4f2;
+    --border: #d1d1d6;
+    --text: #1d1d1f;
+  }
+  * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif; }
+  body { 
+    margin: 0; 
+    padding: env(safe-area-inset-top) 16px env(safe-area-inset-bottom) 16px; 
+    background: var(--bg); 
+    color: var(--text); 
+    user-select: none; 
+    -webkit-user-select: none; 
+  }
+  
+  .header-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; margin-top: 10px; }
+  .dist-title { font-size: 1.25rem; font-weight: 700; }
+  .btn-group { display: flex; gap: 8px; }
+  .btn-pill {
+    border: 1px solid var(--border); background: #fff; border-radius: 16px;
+    padding: 6px 12px; font-size: 0.85rem; font-weight: 500; color: #333; cursor: pointer;
+  }
+  .btn-pill:active { background: #e5e5ea; }
+
+  select, input {
+    font-size: 1rem; padding: 8px 10px; border: 1px solid var(--border);
+    border-radius: 8px; background: #fff; color: var(--text); width: 100%;
+    outline: none; -webkit-appearance: none;
+  }
+  .dist-selector { margin-bottom: 16px; font-weight: 600; text-align: center; }
+
+  .grid-params { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+  .grid-params.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+  .param-box label { display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 4px; color: #333; }
+
+  .calc-row { display: grid; grid-template-columns: 1fr 1.15fr 1.15fr; gap: 10px; align-items: end; margin-bottom: 12px; }
+  .calc-row.int-mode { grid-template-columns: 0.85fr 0.85fr 1.1fr 1.1fr; }
+  .prob-input { background: var(--pink) !important; font-weight: 700; border-color: #df7a7b !important; color: #000; }
+
+  .cond-bar { background: #e5e5ea; border-radius: 8px; padding: 10px; margin-bottom: 12px; }
+  .cond-header { display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; font-weight: 600; }
+  .cond-grid { display: grid; grid-template-columns: 1.1fr 0.9fr 0.9fr; gap: 8px; margin-top: 8px; }
+
+  .chart-title { text-align: center; font-weight: 700; font-size: 1rem; margin: 12px 0; }
+  .canvas-container { width: 100%; display: flex; justify-content: center; }
+  canvas { width: 100%; max-width: 420px; height: 310px; }
+
+  .stats-footer { text-align: center; font-size: 0.85rem; font-weight: 600; margin-top: 10px; color: #333; }
+  .dev-box { background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-top: 12px; font-size: 0.85rem; line-height: 1.5; }
+
+  .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; padding: 20px; z-index: 1000; }
+  .modal-content { background: #fff; padding: 20px; border-radius: 14px; max-width: 360px; width: 100%; font-size: 0.9rem; line-height: 1.5; max-height: 80vh; overflow-y: auto; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<select id="distSelect" class="dist-selector" onchange="initDist()">
+  <optgroup label="Continuous">
+    <option value="normal">Normal — X ~ N(μ, σ)</option>
+    <option value="norm2q">Normal (from 2 Quantiles)</option>
+    <option value="exp">Exponential — X ~ Exp(λ)</option>
+    <option value="unifC">Continuous Uniform — X ~ U(a, b)</option>
+    <option value="triang">Triangular — X ~ Tri(a, b, c)</option>
+    <option value="poly">Polynomial Density f(x) = k(Ax³+Bx²+Cx+D)</option>
+    <option value="tcl">Central Limit Theorem (Sum / Mean)</option>
+  </optgroup>
+  <optgroup label="Discrete">
+    <option value="binom">Binomial — X ~ Bin(n, p)</option>
+    <option value="pois">Poisson — X ~ Pois(λ)</option>
+    <option value="hyper">Hypergeometric — X ~ Hip(N, M, n)</option>
+    <option value="geom">Geometric (x ≥ 1)</option>
+    <option value="negbin">Negative Binomial (x ≥ r)</option>
+    <option value="unifD">Discrete Uniform — X ~ Ud(a, b)</option>
+    <option value="discK">Discrete Table (with unknown 'k')</option>
+    <option value="bayes3">Bayes Theorem (3 Partitions)</option>
+    <option value="bin2norm">Binomial to Normal Approx</option>
+  </optgroup>
+</select>
+
+<div class="header-bar">
+  <div class="dist-title" id="distTitle">X ~ N(μ, σ)</div>
+  <div class="btn-group">
+    <button class="btn-pill" onclick="toggleModal('form')">Formulas</button>
+    <button class="btn-pill" onclick="toggleModal('dev')">Steps</button>
+  </div>
+</div>
+
+<div class="grid-params" id="paramsContainer"></div>
+
+<div class="calc-row" id="calcRow">
+  <div class="param-box">
+    <label id="x1Label">x:</label>
+    <input type="number" id="xVal" step="any" oninput="calculate('fromX')">
+  </div>
+  <div class="param-box hidden" id="x2Box">
+    <label>x₂:</label>
+    <input type="number" id="x2Val" step="any" oninput="calculate('fromX')">
+  </div>
+  <div class="param-box">
+    <label>&nbsp;</label>
+    <select id="modeSelect" onchange="onModeChange()"></select>
+  </div>
+  <div class="param-box">
+    <label id="probLabel">&nbsp;</label>
+    <input type="number" id="probVal" class="prob-input" step="0.0001" min="0" max="1" oninput="calculate('fromP')">
+  </div>
+</div>
+
+<div class="cond-bar" id="condBar">
+  <div class="cond-header">
+    <span>Conditional P(A | B)</span>
+    <input type="checkbox" id="condCheck" style="width:18px;height:18px;" onchange="toggleCond()">
+  </div>
+  <div class="cond-grid hidden" id="condGrid">
+    <div class="param-box">
+      <label style="font-size:0.8rem;">Given B:</label>
+      <select id="condMode" onchange="calculate('fromX')">
+        <option value="gt">X &gt; b₁</option>
+        <option value="ge">X ≥ b₁</option>
+        <option value="lt">X &lt; b₁</option>
+        <option value="le">X ≤ b₁</option>
+        <option value="int">b₁ ≤ X ≤ b₂</option>
+      </select>
+    </div>
+    <div class="param-box">
+      <label style="font-size:0.8rem;">b₁:</label>
+      <input type="number" id="b1Val" value="0" step="any" oninput="calculate('fromX')">
+    </div>
+    <div class="param-box">
+      <label style="font-size:0.8rem;">b₂:</label>
+      <input type="number" id="b2Val" value="10" step="any" oninput="calculate('fromX')">
+    </div>
+  </div>
+</div>
+
+<div class="chart-title" id="dynamicTitle">X ~ N(μ=100.0, σ=16.0)</div>
+
+<div class="canvas-container">
+  <canvas id="plotCanvas" width="700" height="500"></canvas>
+</div>
+
+<div class="stats-footer" id="statsFooter"></div>
+<div class="dev-box hidden" id="devBox"></div>
+
+<div class="modal" id="infoModal" onclick="closeModal()">
+  <div class="modal-content" id="modalText" onclick="event.stopPropagation()"></div>
+</div>
+
+<script>
+// --- Math Core ---
+function lnGamma(z) {
+  const c = [76.18009172947146, -86.50532032941677, 24.01409824083091, -1.231739572450155, 0.1208650973866179e-2, -0.5395239384953e-5];
+  let x = z, y = z, tmp = x + 5.5;
+  tmp -= (x + 0.5) * Math.log(tmp);
+  let ser = 1.000000000190015;
+  for (let i = 0; i < 6; i++) ser += c[i] / ++y;
+  return -tmp + Math.log(2.5066282746310005 * ser / x);
+}
+function lnChoose(n, k) {
+  if (k < 0 || k > n) return -Infinity; if (k === 0 || k === n) return 0;
+  return lnGamma(n + 1) - lnGamma(k + 1) - lnGamma(n - k + 1);
+}
+function erf(x) {
+  const sign = (x >= 0) ? 1 : -1; x = Math.abs(x);
+  const a1 = 0.254829592, a2 = -0.284496736, a3 = 1.421413741, a4 = -1.453152027, a5 = 1.061405429, p = 0.3275911;
+  const t = 1.0 / (1.0 + p * x);
+  return sign * (1.0 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-x * x));
+}
+function normCDF(x, mu, sd) { return 0.5 * (1 + erf((x - mu) / (sd * Math.sqrt(2)))); }
+function normInv(p, mu, sd) {
+  if (p <= 0) return -Infinity; if (p >= 1) return Infinity;
+  const a = [-3.969683028665376e+01, 2.209460984245205e+02, -2.759285104469687e+02, 1.383577518672690e+02, -3.066479806614716e+01, 2.506628277459239e+00];
+  const b = [-5.447609879822406e+01, 1.615858368580409e+02, -1.556989798598866e+02, 6.680131188771972e+01, -1.328068155288572e+01];
+  const c = [-7.784894002430293e-03, -3.223964580411365e-01, -2.400758277161838e+00, -2.549732539343734e+00, 4.374664141464968e+00, 2.938163982698783e+00];
+  const d = [7.784695709041462e-03, 3.224671290700398e-01, 2.445134137142996e+00, 3.754408661907416e+00];
+  const pLow = 0.02425, pHigh = 1 - pLow;
+  let q, r, z;
+  if (p < pLow) {
+    q = Math.sqrt(-2 * Math.log(p));
+    z = (((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) / ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1);
+  } else if (p <= pHigh) {
+    q = p - 0.5; r = q * q;
+    z = (((((a[0]*r+a[1])*r+a[2])*r+a[3])*r+a[4])*r+a[5])*q / (((((b[0]*r+b[1])*r+b[2])*r+b[3])*r+b[4])*r+1);
+  } else {
+    q = Math.sqrt(-2 * Math.log(1 - p));
+    z = -(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) / ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1);
+  }
+  return mu + z * sd;
+}
+function numericInv(cdfFunc, targetP, low, high) {
+  let a = low, b = high, mid = (a + b) / 2;
+  for (let i = 0; i < 60; i++) {
+    mid = (a + b) / 2;
+    if (cdfFunc(mid) < targetP) a = mid; else b = mid;
+  }
+  return mid;
+}
+
+let devText = "";
+
+// --- Models ---
+const DISTS = {
+  normal: {
+    title: "X ~ N(μ, σ)", type: "cont",
+    params: [{id:"mu", label:"μ:", val:100, step:1}, {id:"sd", label:"σ:", val:16, step:0.5}],
+    dx: 110, dx2: 120,
+    fml: "<b>Normal Distribution:</b><br>Z = (X - μ) / σ<br>E(X) = μ &nbsp;|&nbsp; Var(X) = σ²",
+    pdf: (x, p) => (1 / (p.sd * Math.sqrt(2 * Math.PI))) * Math.exp(-0.5 * Math.pow((x - p.mu) / p.sd, 2)),
+    cdf: (x, p) => normCDF(x, p.mu, p.sd),
+    inv: (prob, p) => normInv(prob, p.mu, p.sd),
+    stats: (p) => ({ mu: p.mu, var: p.sd * p.sd, sd: p.sd }),
+    dom: (p) => [p.mu - 4 * p.sd, p.mu + 4 * p.sd]
+  },
+  norm2q: {
+    title: "X ~ N(μ, σ) [2 Quantiles]", type: "cont",
+    params: [{id:"x1", label:"x₁:", val:400, step:10}, {id:"p1", label:"P(X < x₁):", val:0.25, step:0.01}, {id:"x2", label:"x₂:", val:800, step:10}, {id:"p2", label:"P(X > x₂):", val:0.10, step:0.01}],
+    dx: 500, dx2: 700,
+    fml: "<b>Normal from 2 Quantiles:</b><br>x₁ = μ + z₁·σ<br>x₂ = μ + z₂·σ<br>σ = (x₂ - x₁) / (z₂ - z₁)",
+    getEff: (p) => {
+      const z1 = normInv(p.p1, 0, 1), z2 = normInv(1 - p.p2, 0, 1);
+      const sd = Math.abs((p.x2 - p.x1) / (z2 - z1)) || 1;
+      return { mu: p.x1 - z1 * sd, sd, z1, z2 };
+    },
+    pdf: function(x, p) { return DISTS.normal.pdf(x, this.getEff(p)); },
+    cdf: function(x, p) { return DISTS.normal.cdf(x, this.getEff(p)); },
+    inv: function(prob, p) { return DISTS.normal.inv(prob, this.getEff(p)); },
+    stats: function(p) { const e = this.getEff(p); return { mu: e.mu, var: e.sd * e.sd, sd: e.sd, z1: e.z1, z2: e.z2 }; },
+    dom: function(p) { const e = this.getEff(p); return [e.mu - 4 * e.sd, e.mu + 4 * e.sd]; }
+  },
+  binom: {
+    title: "X ~ Bin(n, p)", type: "disc",
+    params: [{id:"n", label:"n:", val:10, step:1}, {id:"p", label:"p:", val:0.7, step:0.05}],
+    dx: 7, dx2: 10,
+    fml: "<b>Binomial:</b><br>P(X=x) = C(n,x) p^x (1-p)^(n-x)<br>E(X) = np &nbsp;|&nbsp; Var(X) = np(1-p)",
+    pmf: (k, p) => {
+      if (k < 0 || k > p.n || !Number.isInteger(k)) return 0;
+      if (p.p <= 0) return k === 0 ? 1 : 0; if (p.p >= 1) return k === p.n ? 1 : 0;
+      return Math.exp(lnChoose(p.n, k) + k * Math.log(p.p) + (p.n - k) * Math.log(1 - p.p));
+    },
+    stats: (p) => ({ mu: p.n * p.p, var: p.n * p.p * (1 - p.p), sd: Math.sqrt(p.n * p.p * (1 - p.p)) }),
+    dom: (p) => [0, p.n]
+  },
+  discK: {
+    title: "Discrete PMF (k solver)", type: "spec_k",
+    params: [{id:"xs", label:"xᵢ (csv):", val:"1, 2, 3", text:true}, {id:"ps", label:"P(X=xᵢ) (use k):", val:"0.18, 0.42, k", text:true}],
+    dx: 2, dx2: 3,
+    fml: "<b>Discrete Table with k:</b><br>Solves for k such that Σ P(X=xᵢ) = 1.<br>Marks E(X) on the plot."
+  },
+  bayes3: {
+    title: "Bayes (A, B, C)", type: "spec_b",
+    params: [
+      {id:"pa", label:"P(A):", val:0.52, step:0.01}, {id:"pb", label:"P(B):", val:0.28, step:0.01},
+      {id:"pea", label:"P(E|A):", val:0.12, step:0.01}, {id:"peb", label:"P(E|B):", val:0.35, step:0.01},
+      {id:"pec", label:"P(E|C):", val:0.65, step:0.01}, {id:"tgt", label:"Target (1=A,2=B,3=C):", val:3, step:1}
+    ],
+    dx: 3, dx2: 3,
+    fml: "<b>Bayes Theorem:</b><br>P(C) = 1 - P(A) - P(B)<br>P(E) = Σ P(E|i)P(i)<br>P(i|E) = P(E|i)P(i) / P(E)"
+  },
+  tcl: {
+    title: "CLT: Sum / Mean", type: "cont",
+    params: [{id:"mu", label:"μ:", val:20, step:1}, {id:"sd", label:"σ:", val:4, step:0.5}, {id:"n", label:"n:", val:100, step:1}, {id:"mode", label:"1=Sum | 0=Mean:", val:1, step:1}],
+    dx: 2030, dx2: 2100,
+    fml: "<b>Central Limit Theorem:</b><br>S = ΣXᵢ ~ N(nμ, σ√n)<br>X̄ = S/n ~ N(μ, σ/√n)",
+    getEff: (p) => {
+      const isS = Math.round(p.mode) === 1;
+      return { mu: isS ? (p.n * p.mu) : p.mu, sd: isS ? (p.sd * Math.sqrt(p.n)) : (p.sd / Math.sqrt(p.n)), isS };
+    },
+    pdf: function(x, p) { return DISTS.normal.pdf(x, this.getEff(p)); },
+    cdf: function(x, p) { return DISTS.normal.cdf(x, this.getEff(p)); },
+    inv: function(prob, p) { return DISTS.normal.inv(prob, this.getEff(p)); },
+    stats: function(p) { const e = this.getEff(p); return { mu: e.mu, var: e.sd * e.sd, sd: e.sd, isS: e.isS }; },
+    dom: function(p) { const e = this.getEff(p); return [e.mu - 4 * e.sd, e.mu + 4 * e.sd]; }
+  },
+  exp: {
+    title: "X ~ Exp(λ)", type: "cont",
+    params: [{id:"lam", label:"λ:", val:0.5, step:0.1}],
+    dx: 2, dx2: 4,
+    fml: "<b>Exponential:</b><br>E(X) = 1/λ &nbsp;|&nbsp; Var(X) = 1/λ²",
+    pdf: (x, p) => x < 0 ? 0 : p.lam * Math.exp(-p.lam * x),
+    cdf: (x, p) => x < 0 ? 0 : 1 - Math.exp(-p.lam * x),
+    inv: (prob, p) => -Math.log(1 - prob) / p.lam,
+    stats: (p) => ({ mu: 1 / p.lam, var: 1 / (p.lam * p.lam), sd: 1 / p.lam }),
+    dom: (p) => [0, 5 / p.lam]
+  },
+  unifC: {
+    title: "X ~ U(a, b)", type: "cont",
+    params: [{id:"a", label:"a:", val:0, step:1}, {id:"b", label:"b:", val:10, step:1}],
+    dx: 4, dx2: 7,
+    fml: "<b>Continuous Uniform:</b><br>f(x) = 1/(b-a)",
+    pdf: (x, p) => (x >= p.a && x <= p.b && p.b > p.a) ? 1 / (p.b - p.a) : 0,
+    cdf: (x, p) => x <= p.a ? 0 : (x >= p.b ? 1 : (x - p.a) / (p.b - p.a)),
+    inv: (prob, p) => p.a + prob * (p.b - p.a),
+    stats: (p) => ({ mu: (p.a + p.b) / 2, var: Math.pow(p.b - p.a, 2) / 12, sd: (p.b - p.a) / Math.sqrt(12) }),
+    dom: (p) => { const d = (p.b - p.a) * 0.15; return [p.a - d, p.b + d]; }
+  },
+  poly: {
+    title: "f(x) = k(Ax³+Bx²+Cx+D)", type: "cont",
+    params: [
+      {id:"xmin", label:"x_min:", val:0, step:0.5}, {id:"xmax", label:"x_max:", val:4, step:0.5},
+      {id:"A", label:"A (x³):", val:1, step:1}, {id:"B", label:"B (x²):", val:0, step:1},
+      {id:"C", label:"C (x):", val:0, step:1}, {id:"D", label:"D (c):", val:2, step:1}
+    ],
+    dx: 2, dx2: 4,
+    fml: "<b>Polynomial Density:</b><br>Normalizes k so ∫f(x)dx = 1.",
+    intP: (p, x0, x1) => { const F = x => (p.A/4)*Math.pow(x,4) + (p.B/3)*Math.pow(x,3) + (p.C/2)*Math.pow(x,2) + p.D*x; return F(x1) - F(x0); },
+    getK: function(p) { const a = this.intP(p, p.xmin, p.xmax); return a !== 0 ? (1 / a) : 0; },
+    pdf: function(x, p) { if (x < p.xmin || x > p.xmax || p.xmax <= p.xmin) return 0; return Math.max(0, this.getK(p) * (p.A*Math.pow(x,3) + p.B*x*x + p.C*x + p.D)); },
+    cdf: function(x, p) { if (x <= p.xmin) return 0; if (x >= p.xmax) return 1; return Math.max(0, Math.min(1, this.getK(p) * this.intP(p, p.xmin, x))); },
+    inv: function(prob, p) { return numericInv(xv => this.cdf(xv, p), prob, p.xmin, p.xmax); },
+    stats: function(p) {
+      const k = this.getK(p);
+      const M = (n, x) => k * ((p.A/(n+4))*Math.pow(x,n+4) + (p.B/(n+3))*Math.pow(x,n+3) + (p.C/(n+2))*Math.pow(x,n+2) + (p.D/(n+1))*Math.pow(x,n+1));
+      const mu = M(1, p.xmax) - M(1, p.xmin);
+      const ex2 = M(2, p.xmax) - M(2, p.xmin);
+      const v = Math.max(0, ex2 - mu*mu);
+      return { mu, var: v, sd: Math.sqrt(v), k };
+    },
+    dom: (p) => { const d = (p.xmax - p.xmin) * 0.1; return [p.xmin - d, p.xmax + d]; }
+  },
+  triang: {
+    title: "X ~ Tri(a, b, c)", type: "cont",
+    params: [{id:"a", label:"a:", val:0, step:1}, {id:"b", label:"b:", val:3, step:1}, {id:"c", label:"c (Peak):", val:0, step:1}],
+    dx: 2.5, dx2: 3,
+    fml: "<b>Triangular:</b><br>E(X) = (a+b+c)/3",
+    pdf: (x, p) => {
+      if (p.b <= p.a || x < p.a || x > p.b) return 0;
+      const c = Math.max(p.a, Math.min(p.b, p.c));
+      if (x === c) return 2 / (p.b - p.a);
+      if (x < c) return (2 * (x - p.a)) / ((p.b - p.a) * (c - p.a));
+      return (2 * (p.b - x)) / ((p.b - p.a) * (p.b - c));
+    },
+    cdf: (x, p) => {
+      if (x <= p.a) return 0; if (x >= p.b) return 1;
+      const c = Math.max(p.a, Math.min(p.b, p.c));
+      if (x <= c) return Math.pow(x - p.a, 2) / ((p.b - p.a) * (c - p.a));
+      return 1 - Math.pow(p.b - x, 2) / ((p.b - p.a) * (p.b - c));
+    },
+    inv: (prob, p) => {
+      const c = Math.max(p.a, Math.min(p.b, p.c));
+      const fc = (c - p.a) / (p.b - p.a);
+      if (prob <= fc) return p.a + Math.sqrt(prob * (p.b - p.a) * (c - p.a));
+      return p.b - Math.sqrt((1 - prob) * (p.b - p.a) * (p.b - c));
+    },
+    stats: (p) => {
+      const c = Math.max(p.a, Math.min(p.b, p.c));
+      const mu = (p.a + p.b + c) / 3;
+      const v = (p.a*p.a + p.b*p.b + c*c - p.a*p.b - p.a*c - p.b*c) / 18;
+      return { mu, var: v, sd: Math.sqrt(v) };
+    },
+    dom: (p) => [p.a - (p.b - p.a)*0.1, p.b + (p.b - p.a)*0.1]
+  },
+  pois: {
+    title: "X ~ Pois(λ)", type: "disc",
+    params: [{id:"lam", label:"λ:", val:2.5, step:0.5}],
+    dx: 2, dx2: 5,
+    fml: "<b>Poisson:</b><br>P(X=x) = (e^(-λ)·λ^x)/x!",
+    pmf: (k, p) => (k < 0 || !Number.isInteger(k)) ? 0 : Math.exp(k * Math.log(p.lam) - p.lam - lnGamma(k + 1)),
+    stats: (p) => ({ mu: p.lam, var: p.lam, sd: Math.sqrt(p.lam) }),
+    dom: (p) => [0, Math.ceil(p.lam + 4 * Math.sqrt(p.lam) + 2)]
+  },
+  hyper: {
+    title: "X ~ Hip(N, M, n)", type: "disc",
+    params: [{id:"N", label:"N (Pop):", val:30, step:1}, {id:"M", label:"M (Succ):", val:3, step:1}, {id:"n", label:"n (Samp):", val:5, step:1}],
+    dx: 1, dx2: 2,
+    fml: "<b>Hypergeometric:</b><br>Without replacement.",
+    pmf: (k, p) => {
+      const minK = Math.max(0, p.n - (p.N - p.M)), maxK = Math.min(p.n, p.M);
+      if (k < minK || k > maxK || !Number.isInteger(k)) return 0;
+      return Math.exp(lnChoose(p.M, k) + lnChoose(p.N - p.M, p.n - k) - lnChoose(p.N, p.n));
+    },
+    stats: (p) => {
+      const mu = p.n * (p.M / p.N);
+      const v = mu * (1 - p.M / p.N) * ((p.N - p.n) / Math.max(1, p.N - 1));
+      return { mu, var: v, sd: Math.sqrt(v) };
+    },
+    dom: (p) => [Math.max(0, p.n - (p.N - p.M)), Math.min(p.n, p.M)]
+  },
+  geom: {
+    title: "X ~ Geom(p)", type: "disc",
+    params: [{id:"p", label:"p:", val:0.25, step:0.05}],
+    dx: 3, dx2: 5,
+    fml: "<b>Geometric (x ≥ 1):</b><br>P(X=x) = (1-p)^(x-1)p",
+    pmf: (k, p) => (k < 1 || !Number.isInteger(k)) ? 0 : Math.pow(1 - p.p, k - 1) * p.p,
+    stats: (p) => ({ mu: 1 / p.p, var: (1 - p.p) / (p.p * p.p), sd: Math.sqrt(1 - p.p) / p.p }),
+    dom: (p) => [1, Math.min(60, Math.ceil((1 / p.p) + 4 * (Math.sqrt(1 - p.p) / p.p)))]
+  },
+  negbin: {
+    title: "X ~ BN(r, p)", type: "disc",
+    params: [{id:"r", label:"r:", val:3, step:1}, {id:"p", label:"p:", val:0.3, step:0.05}],
+    dx: 8, dx2: 12,
+    fml: "<b>Negative Binomial (x ≥ r):</b>",
+    pmf: (k, p) => (k < p.r || !Number.isInteger(k)) ? 0 : Math.exp(lnChoose(k - 1, p.r - 1) + p.r * Math.log(p.p) + (k - p.r) * Math.log(1 - p.p)),
+    stats: (p) => ({ mu: p.r / p.p, var: (p.r * (1 - p.p)) / (p.p * p.p), sd: Math.sqrt((p.r * (1 - p.p)) / (p.p * p.p)) }),
+    dom: (p) => [p.r, Math.ceil((p.r / p.p) + 4 * Math.sqrt((p.r * (1 - p.p)) / (p.p * p.p)))]
+  },
+  unifD: {
+    title: "X ~ Ud(a, b)", type: "disc",
+    params: [{id:"a", label:"a:", val:1, step:1}, {id:"b", label:"b:", val:6, step:1}],
+    dx: 3, dx2: 5,
+    fml: "<b>Discrete Uniform:</b><br>P(X=x) = 1/(b-a+1)",
+    pmf: (k, p) => (k >= p.a && k <= p.b && Number.isInteger(k) && p.b >= p.a) ? 1 / (p.b - p.a + 1) : 0,
+    stats: (p) => { const n = p.b - p.a + 1; return { mu: (p.a + p.b) / 2, var: (n * n - 1) / 12, sd: Math.sqrt((n * n - 1) / 12) }; },
+    dom: (p) => [p.a, p.b]
+  },
+  bin2norm: {
+    title: "Bin(n,p) → Normal", type: "cont",
+    params: [{id:"n", label:"n:", val:2000, step:10}, {id:"p", label:"p:", val:0.003, step:0.001}],
+    dx: 6, dx2: 10,
+    fml: "<b>Binomial to Normal Approx</b>",
+    getEff: (p) => ({ mu: p.n * p.p, sd: Math.sqrt(p.n * p.p * (1 - p.p)) }),
+    pdf: function(x, p) { return DISTS.normal.pdf(x, this.getEff(p)); },
+    cdf: function(x, p) { return DISTS.normal.cdf(x, this.getEff(p)); },
+    inv: function(prob, p) { return DISTS.normal.inv(prob, this.getEff(p)); },
+    stats: function(p) { const e = this.getEff(p); return { mu: e.mu, var: e.sd * e.sd, sd: e.sd }; },
+    dom: function(p) { const e = this.getEff(p); return [e.mu - 4 * e.sd, e.mu + 4 * e.sd]; }
+  }
+};
+
+// --- UI Logic ---
+function initDist() {
+  const key = document.getElementById("distSelect").value;
+  const m = DISTS[key];
+  document.getElementById("distTitle").innerText = m.title;
+
+  const grid = document.getElementById("paramsContainer");
+  grid.innerHTML = "";
+  grid.className = m.params.length > 2 ? "grid-params cols-3" : "grid-params";
+
+  m.params.forEach(pr => {
+    const div = document.createElement("div");
+    div.className = "param-box";
+    if (pr.text) {
+      div.style.gridColumn = "1 / -1";
+      div.innerHTML = `<label>${pr.label}</label><input type="text" id="p_${pr.id}" value="${pr.val}" oninput="calculate('fromX')">`;
+    } else {
+      div.innerHTML = `<label>${pr.label}</label><input type="number" id="p_${pr.id}" value="${pr.val}" step="${pr.step}" oninput="calculate('fromX')">`;
+    }
+    grid.appendChild(div);
+  });
+
+  const isSpec = (key === "bayes3");
+  document.getElementById("calcRow").classList.toggle("hidden", isSpec);
+  document.getElementById("condBar").classList.toggle("hidden", isSpec);
+
+  const modeSel = document.getElementById("modeSelect");
+  if (m.type === "cont") {
+    modeSel.innerHTML = `<option value="lt">P(X < x) =</option><option value="gt">P(X > x) =</option><option value="int">P(x₁ ≤ X ≤ x₂)</option>`;
+  } else {
+    modeSel.innerHTML = `<option value="eq">P(X = x) =</option><option value="le">P(X ≤ x) =</option><option value="lt">P(X < x) =</option><option value="ge">P(X ≥ x) =</option><option value="gt">P(X > x) =</option><option value="int">P(x₁ ≤ X ≤ x₂)</option>`;
+  }
+
+  document.getElementById("xVal").value = m.dx;
+  document.getElementById("x2Val").value = m.dx2;
+  onModeChange();
+}
+
+function onModeChange() {
+  const mode = document.getElementById("modeSelect").value;
+  const isInt = (mode === "int");
+  document.getElementById("x2Box").classList.toggle("hidden", !isInt);
+  document.getElementById("calcRow").classList.toggle("int-mode", isInt);
+  document.getElementById("x1Label").innerText = isInt ? "x₁:" : "x:";
+  document.getElementById("probVal").readOnly = isInt || document.getElementById("condCheck").checked;
+  calculate('fromX');
+}
+
+function toggleCond() {
+  const on = document.getElementById("condCheck").checked;
+  document.getElementById("condGrid").classList.toggle("hidden", !on);
+  document.getElementById("probVal").readOnly = on || (document.getElementById("modeSelect").value === "int");
+  calculate('fromX');
+}
+
+function getParams(m) {
+  const o = {};
+  m.params.forEach(pr => {
+    const el = document.getElementById("p_" + pr.id);
+    o[pr.id] = pr.text ? el.value : (parseFloat(el.value) || 0);
+  });
+  return o;
+}
+
+function checkDisc(k, mode, v1, v2) {
+  if (mode === "eq") return Math.abs(k - v1) < 1e-9;
+  if (mode === "le") return k <= v1 + 1e-9;
+  if (mode === "lt") return k < v1 - 1e-9;
+  if (mode === "ge") return k >= v1 - 1e-9;
+  if (mode === "gt") return k > v1 + 1e-9;
+  if (mode === "int") return k >= v1 - 1e-9 && k <= v2 + 1e-9;
+  return false;
+}
+
+function contProb(m, p, low, high) {
+  if (high <= low) return 0;
+  const ch = (high === Infinity) ? 1 : m.cdf(high, p);
+  const cl = (low === -Infinity) ? 0 : m.cdf(low, p);
+  return Math.max(0, ch - cl);
+}
+
+function boundsCont(mode, v1, v2) {
+  if (mode === "lt" || mode === "le") return [-Infinity, v1];
+  if (mode === "gt" || mode === "ge") return [v1, Infinity];
+  return [v1, v2];
+}
+
+function discCDF(k, m, p) {
+  const dom = m.dom(p);
+  let s = 0;
+  for (let i = Math.min(0, dom[0]); i <= Math.floor(k); i++) s += m.pmf(i, p);
+  return Math.min(1, Math.max(0, s));
+}
+
+// --- Calculation ---
+function calculate(dir) {
+  const key = document.getElementById("distSelect").value;
+  const m = DISTS[key];
+  const p = getParams(m);
+  const devBox = document.getElementById("devBox");
+  devBox.classList.add("hidden");
+
+  if (key === "bayes3") { runBayes(p); return; }
+  if (key === "discK") { runDiscK(p); return; }
+
+  const mode = document.getElementById("modeSelect").value;
+  const x = parseFloat(document.getElementById("xVal").value);
+  const x2 = parseFloat(document.getElementById("x2Val").value);
+  let prob = parseFloat(document.getElementById("probVal").value);
+  const condOn = document.getElementById("condCheck").checked;
+
+  if (condOn) {
+    const cm = document.getElementById("condMode").value;
+    const b1 = parseFloat(document.getElementById("b1Val").value) || 0;
+    const b2 = parseFloat(document.getElementById("b2Val").value) || 0;
+    let pAB = 0, pB = 0;
+    if (m.type === "cont") {
+      const [aL, aH] = boundsCont(mode, x, x2);
+      const [bL, bH] = boundsCont(cm, b1, b2);
+      pB = contProb(m, p, bL, bH);
+      pAB = contProb(m, p, Math.max(aL, bL), Math.min(aH, bH));
+    } else {
+      const [dMin, dMax] = m.dom(p);
+      for (let k = Math.min(0, dMin); k <= Math.min(2000, dMax + 40); k++) {
+        const pk = m.pmf(k, p);
+        if (checkDisc(k, cm, b1, b2)) {
+          pB += pk;
+          if (checkDisc(k, mode, x, x2)) pAB += pk;
+        }
+      }
+    }
+    prob = pB > 0 ? (pAB / pB) : 0;
+    document.getElementById("probVal").value = prob.toFixed(6);
+    devBox.classList.remove("hidden");
+    devText = `<b>P(A | B) = P(A ∩ B) / P(B)</b><br>P(A ∩ B) = ${pAB.toFixed(6)}<br>P(B) = ${pB.toFixed(6)}<br><b>Result: ${prob.toFixed(6)}</b>`;
+    devBox.innerHTML = devText;
+  } else if (dir === "fromX" && !isNaN(x)) {
+    if (m.type === "cont") {
+      const [aL, aH] = boundsCont(mode, x, x2);
+      prob = contProb(m, p, aL, aH);
+    } else {
+      const rx = Math.round(x);
+      if (mode === "eq") prob = m.pmf(rx, p);
+      else if (mode === "le") prob = discCDF(rx, m, p);
+      else if (mode === "lt") prob = discCDF(rx - 1, m, p);
+      else if (mode === "ge") prob = 1 - discCDF(rx - 1, m, p);
+      else if (mode === "gt") prob = 1 - discCDF(rx, m, p);
+      else if (mode === "int" && !isNaN(x2)) prob = Math.max(0, discCDF(Math.round(x2), m, p) - discCDF(rx - 1, m, p));
+    }
+    document.getElementById("probVal").value = Math.max(0, Math.min(1, prob)).toFixed(6);
+  } else if (dir === "fromP" && mode !== "int" && !isNaN(prob) && prob >= 0 && prob <= 1) {
+    if (m.type === "cont") {
+      x = m.inv(mode === "lt" ? prob : (1 - prob), p);
+      document.getElementById("xVal").value = x.toFixed(4);
+    } else if (mode !== "eq") {
+      const target = (mode === "le" || mode === "lt") ? prob : (1 - prob);
+      let acc = 0, k = m.dom(p)[0];
+      while (acc < target && k < 10000) { acc += m.pmf(k, p); if (acc >= target) break; k++; }
+      document.getElementById("xVal").value = (mode === "lt" || mode === "ge") ? k + 1 : k;
+    }
+  }
+
+  const st = m.stats(p);
+  const pDesc = m.params.map(pr => `${pr.id}=${p[pr.id]}`).join(", ");
+  document.getElementById("dynamicTitle").innerText = `${m.title.split("[")[0].trim()} (${pDesc})`;
+  document.getElementById("statsFooter").innerText = `μ=E(X)=${st.mu.toFixed(3)}   σ²=Var(X)=${st.var.toFixed(4)}   σ=SD(X)=${st.sd.toFixed(4)}`;
+
+  if (key === "norm2q") {
+    devBox.classList.remove("hidden");
+    devText = `<b>Parameters found:</b><br>z₁ = ${st.z1.toFixed(4)} | z₂ = ${st.z2.toFixed(4)}<br>σ = ${st.sd.toFixed(4)}<br>μ = ${st.mu.toFixed(4)}`;
+    devBox.innerHTML = devText;
+  } else if (key === "tcl") {
+    devBox.classList.remove("hidden");
+    devText = st.isS ? `<b>Sum (ΣX):</b> μ_S = ${st.mu.toFixed(2)}, σ_S = ${st.sd.toFixed(4)}` : `<b>Mean (X̄):</b> μ_X̄ = ${st.mu.toFixed(2)}, σ_X̄ = ${st.sd.toFixed(4)}`;
+    devBox.innerHTML = devText;
+  } else if (key === "bin2norm") {
+    devBox.classList.remove("hidden");
+    const e = m.getEff(p);
+    const pCC = (mode === "lt") ? normCDF(x - 0.5, e.mu, e.sd) : (mode === "gt") ? (1 - normCDF(x - 0.5, e.mu, e.sd)) : (normCDF(x2 + 0.5, e.mu, e.sd) - normCDF(x - 0.5, e.mu, e.sd));
+    devText = `<b>Normal Approx:</b><br>No CC: ${parseFloat(document.getElementById("probVal").value).toFixed(6)}<br>With CC (±0.5): ${pCC.toFixed(6)}`;
+    devBox.innerHTML = devText;
+  } else {
+    devText = `<b>Stats:</b><br>E(X) = ${st.mu.toFixed(4)} | Var(X) = ${st.var.toFixed(4)} | SD(X) = ${st.sd.toFixed(4)}`;
+  }
+
+  drawPlot(m, p, parseFloat(document.getElementById("xVal").value), parseFloat(document.getElementById("x2Val").value), mode);
+}
+
+function runDiscK(p) {
+  const xs = p.xs.split(",").map(s => parseFloat(s.trim())).filter(n => !isNaN(n));
+  const rawTokens = p.ps.split(",").map(s => s.trim().toLowerCase());
+  const n = Math.min(xs.length, rawTokens.length);
+  if (n === 0) return;
+
+  let sumKCoef = 0, sumConst = 0;
+  const parsed = [];
+  for (let i = 0; i < n; i++) {
+    const tk = rawTokens[i];
+    if (tk.includes("k")) {
+      const prefix = tk.replace("k", "").trim();
+      const c = (prefix === "" || prefix === "+") ? 1 : (prefix === "-" ? -1 : parseFloat(prefix) || 1);
+      sumKCoef += c; parsed.push({ kCoef: c, cVal: 0 });
+    } else {
+      const v = parseFloat(tk) || 0; sumConst += v; parsed.push({ kCoef: 0, cVal: v });
+    }
+  }
+
+  const kSolved = sumKCoef !== 0 ? ((1 - sumConst) / sumKCoef) : 0;
+  const probs = parsed.map(item => item.kCoef * kSolved + item.cVal);
+
+  let mu = 0, ex2 = 0;
+  for (let i = 0; i < n; i++) { mu += xs[i] * probs[i]; ex2 += xs[i] * xs[i] * probs[i]; }
+  const v = Math.max(0, ex2 - mu * mu);
+  const sd = Math.sqrt(v);
+
+  const mode = document.getElementById("modeSelect").value;
+  const x = parseFloat(document.getElementById("xVal").value) || 0;
+  const x2 = parseFloat(document.getElementById("x2Val").value) || 0;
+  let probOut = 0;
+  for (let i = 0; i < n; i++) { if (checkDisc(xs[i], mode, x, x2)) probOut += probs[i]; }
+  document.getElementById("probVal").value = probOut.toFixed(6);
+
+  document.getElementById("dynamicTitle").innerText = `k = ${kSolved.toFixed(4)} | E[X] = ${mu.toFixed(4)}`;
+  document.getElementById("statsFooter").innerText = `μ=E(X)=${mu.toFixed(4)}   σ²=Var(X)=${v.toFixed(4)}   σ=SD(X)=${sd.toFixed(4)}`;
+
+  const devBox = document.getElementById("devBox");
+  devBox.classList.remove("hidden");
+  devText = `<b>Determining k:</b><br>k = ${kSolved.toFixed(4)}<br>E[X] = ${mu.toFixed(4)}<br>Var(X) = ${v.toFixed(4)}`;
+  devBox.innerHTML = devText;
+
+  const canvas = document.getElementById("plotCanvas");
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  const padL = 72, padR = 30, padT = 28, padB = 55;
+  const W = canvas.width - padL - padR, H = canvas.height - padT - padB;
+  const maxY = Math.max(...probs, 0.1) * 1.18;
+  const xMin = Math.min(...xs) - 0.6, xMax = Math.max(...xs) + 0.6;
+  const toX = xv => padL + ((xv - xMin) / (xMax - xMin)) * W;
+  const barW = Math.min(38, (W / (n + 2)) * 0.6);
+
+  for (let i = 0; i < n; i++) {
+    const cx = toX(xs[i]);
+    const bh = (probs[i] / maxY) * H;
+    ctx.fillStyle = checkDisc(xs[i], mode, x, x2) ? "#f79696" : "#6da4f2";
+    ctx.fillRect(cx - barW / 2, padT + H - bh, barW, bh);
+    ctx.fillStyle = "#1d1d1f";
+    ctx.font = "bold 18px -apple-system, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(probs[i].toFixed(2), cx, padT + H - bh - 8);
+    ctx.font = "20px -apple-system, sans-serif";
+    ctx.fillText(xs[i], cx, padT + H + 30);
+  }
+
+  const muX = toX(mu);
+  ctx.save();
+  ctx.strokeStyle = "#d70015";
+  ctx.lineWidth = 3;
+  ctx.setLineDash([8, 6]);
+  ctx.beginPath(); ctx.moveTo(muX, padT); ctx.lineTo(muX, padT + H); ctx.stroke();
+  ctx.fillStyle = "#d70015";
+  ctx.font = "bold 19px -apple-system, sans-serif";
+  ctx.fillText(`E[X]=${mu.toFixed(2)}`, muX, padT - 6);
+  ctx.restore();
+
+  drawAxes(ctx, padL, padT, W, H, xMin, xMax, maxY, true);
+}
+
+function runBayes(p) {
+  const pc = Math.max(0, 1 - p.pa - p.pb);
+  const tA = p.pa * p.pea, tB = p.pb * p.peb, tC = pc * p.pec;
+  const pTotal = tA + tB + tC;
+  const postA = pTotal > 0 ? (tA / pTotal) : 0, postB = pTotal > 0 ? (tB / pTotal) : 0, postC = pTotal > 0 ? (tC / pTotal) : 0;
+  const idx = Math.round(p.tgt);
+  const chosenPost = idx === 1 ? postA : (idx === 2 ? postB : postC);
+
+  document.getElementById("dynamicTitle").innerText = `P(E) = ${pTotal.toFixed(6)} | P(${idx===1?"A":idx===2?"B":"C"} | E) = ${chosenPost.toFixed(6)}`;
+  document.getElementById("statsFooter").innerText = `P(A|E)=${postA.toFixed(4)}   P(B|E)=${postB.toFixed(4)}   P(C|E)=${postC.toFixed(4)}`;
+
+  const devBox = document.getElementById("devBox");
+  devBox.classList.remove("hidden");
+  devText = `<b>Bayes Theorem:</b><br>P(C) = ${pc.toFixed(4)}<br>P(E) = ${pTotal.toFixed(6)}<br>P(Target | E) = ${chosenPost.toFixed(6)}`;
+  devBox.innerHTML = devText;
+
+  const canvas = document.getElementById("plotCanvas");
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const padL = 72, padR = 30, padT = 28, padB = 55;
+  const W = canvas.width - padL - padR, H = canvas.height - padT - padB;
+  const posts = [postA, postB, postC], labels = ["P(A|E)", "P(B|E)", "P(C|E)"];
+  const maxY = Math.max(...posts, 0.2) * 1.2;
+
+  for (let i = 0; i < 3; i++) {
+    const cx = padL + ((i + 1) / 4) * W;
+    const bh = (posts[i] / maxY) * H;
+    ctx.fillStyle = (i + 1 === idx) ? "#f79696" : "#6da4f2";
+    ctx.fillRect(cx - 32, padT + H - bh, 64, bh);
+    ctx.fillStyle = "#1d1d1f";
+    ctx.font = "bold 19px -apple-system, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(posts[i].toFixed(4), cx, padT + H - bh - 8);
+    ctx.fillText(labels[i], cx, padT + H + 32);
+  }
+  drawAxes(ctx, padL, padT, W, H, 0, 1, maxY, true);
+}
+
+function drawPlot(m, p, xVal, x2Val, mode) {
+  const canvas = document.getElementById("plotCanvas");
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const padL = 72, padR = 26, padT = 22, padB = 50;
+  const W = canvas.width - padL - padR, H = canvas.height - padT - padB;
+  const [xMin, xMax] = m.dom(p);
+  if (xMax <= xMin || isNaN(xMin) || isNaN(xMax)) return;
+
+  if (m.type === "cont") {
+    const pts = []; let maxY = 0;
+    for (let i = 0; i <= 280; i++) {
+      const xv = xMin + (i / 280) * (xMax - xMin);
+      const yv = m.pdf(xv, p);
+      if (yv > maxY) maxY = yv;
+      pts.push({x: xv, y: yv});
+    }
+    maxY = (maxY || 1) * 1.12;
+    const toX = xv => padL + ((xv - xMin) / (xMax - xMin)) * W;
+    const toY = yv => padT + H - (yv / maxY) * H;
+
+    ctx.fillStyle = "#f79696";
+    ctx.beginPath();
+    let started = false, lastX = xMin;
+    pts.forEach(pt => {
+      const cond = (mode === "lt") ? (pt.x <= xVal) : (mode === "gt") ? (pt.x >= xVal) : (pt.x >= xVal && pt.x <= x2Val);
+      if (cond) {
+        if (!started) { ctx.moveTo(toX(pt.x), toY(0)); started = true; }
+        ctx.lineTo(toX(pt.x), toY(pt.y));
+        lastX = pt.x;
+      }
+    });
+    if (started) { ctx.lineTo(toX(lastX), toY(0)); ctx.closePath(); ctx.fill(); }
+
+    ctx.strokeStyle = "#1d1d1f";
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    pts.forEach((pt, idx) => idx === 0 ? ctx.moveTo(toX(pt.x), toY(pt.y)) : ctx.lineTo(toX(pt.x), toY(pt.y)));
+    ctx.stroke();
+    drawAxes(ctx, padL, padT, W, H, xMin, xMax, maxY, false);
+  } else {
+    let maxY = 0; const bars = [];
+    for (let k = xMin; k <= xMax; k++) {
+      const yv = m.pmf(k, p);
+      if (yv > maxY) maxY = yv;
+      bars.push({k, y: yv});
+    }
+    maxY = Math.max(maxY * 1.15, 0.05);
+    const stepW = W / (bars.length + 1);
+    const barW = Math.min(30, stepW * 0.68);
+    const rx = Math.round(xVal), rx2 = Math.round(x2Val);
+
+    bars.forEach((b, i) => {
+      const cx = padL + (i + 1) * stepW;
+      const bh = (b.y / maxY) * H;
+      ctx.fillStyle = checkDisc(b.k, mode, rx, rx2) ? "#f79696" : "#6da4f2";
+      ctx.fillRect(cx - barW / 2, padT + H - bh, barW, bh);
+    });
+    drawAxes(ctx, padL, padT, W, H, xMin, xMax, maxY, false);
+  }
+}
+
+function drawAxes(ctx, padL, padT, W, H, xMin, xMax, maxY, hideX) {
+  ctx.strokeStyle = "#444"; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(padL, padT); ctx.lineTo(padL, padT + H); ctx.lineTo(padL + W, padT + H); ctx.stroke();
+  ctx.fillStyle = "#333"; ctx.font = "19px -apple-system, sans-serif"; ctx.textAlign = "right";
+  for (let i = 0; i <= 5; i++) {
+    const val = (maxY * i) / 5;
+    ctx.fillText(val < 0.01 && val > 0 ? val.toExponential(1) : val.toFixed(2), padL - 8, padT + H - (i / 5) * H + 6);
+  }
+  if (!hideX) {
+    ctx.textAlign = "center";
+    const ticks = Math.min(5, Math.max(1, Math.round(xMax - xMin)));
+    for (let i = 0; i <= ticks; i++) {
+      const val = xMin + (i / ticks) * (xMax - xMin);
+      ctx.fillText(Number.isInteger(val) ? val : val.toFixed(1), padL + (i / ticks) * W, padT + H + 30);
+    }
+  }
+}
+
+function toggleModal(type) {
+  const m = DISTS[document.getElementById("distSelect").value];
+  document.getElementById("modalText").innerHTML = (type === "form" ? m.fml : devText) + "<br><br><small>(Tap outside to close)</small>";
+  document.getElementById("infoModal").style.display = "flex";
+}
+function closeModal() { document.getElementById("infoModal").style.display = "none"; }
+
+initDist();
+</script>
+</body>
+</html>
